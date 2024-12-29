@@ -1,7 +1,6 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import GitHub from "next-auth/providers/github";
-import { getUser, registerUser } from "./app/actions/user";
 import prisma from "./app/db";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
@@ -32,29 +31,39 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       }
       return session;
     },
-    async signIn (params) {
-      if(params.user.email){
-        const { email } = params.user;
-        const ifUserExists = await prisma.user.findUnique({
-          where: {
-            email
-          }
-        });
-        if(!ifUserExists){
-          await prisma.user.create({
-            data: {
-              email
+    async signIn({ user, account, profile }) {
+      try {
+        if (user.email) {
+          const ifUserExists = await prisma.user.findUnique({
+            where: {
+              email: user.email
             }
           });
+          if (!ifUserExists) {
+            await prisma.user.create({
+              data: {
+                email: user.email
+              }
+            });
+          }
           return true;
         }
+        return false;
+      } catch (error) {
+        console.error('Error in signIn callback:', error);
+        return false;
       }
-      return true;
-
+    }
+  },
+  cookies: {
+    sessionToken: {
+      name: `${process.env.NODE_ENV === 'production' ? '__Secure-' : ''}next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+      },
     },
-    // authorized: async ({auth}) => {
-    //   return !!auth;
-    // }
-
   },
 });
