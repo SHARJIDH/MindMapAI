@@ -6,6 +6,9 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { getEdgesByMapId, getNodesByMapId, getMap } from '@/app/actions/map';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const Viewmap = async ({ params }: { params: { userId: string, mapId: string } }) => {
 
   const session = await auth();
@@ -17,21 +20,32 @@ const Viewmap = async ({ params }: { params: { userId: string, mapId: string } }
     return <UnauthorizedPage />
   }
 
-  const nodes = await getNodesByMapId(mapId);
-  const edges = await getEdgesByMapId(mapId);
-  const map = await getMap(session?.user?.email, mapId);
+  try {
+    const nodes = await getNodesByMapId(mapId);
+    const edges = await getEdgesByMapId(mapId);
+    const map = await getMap(session?.user?.email, mapId);
 
-  
-  return (
-    <>
-    <Map mapId={mapId} mapname={map?.name} fetchedNodes={nodes} fetchedEdges={edges} />
-      
-    </>
-  )
+    return (
+      <>
+        <Map mapId={mapId} mapname={map?.name} fetchedNodes={nodes} fetchedEdges={edges} />
+      </>
+    )
+  } catch (error) {
+    console.error('Error loading map:', error);
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen">
+        <AlertCircle className="w-16 h-16 text-red-500 mb-4" />
+        <h1 className="text-2xl font-bold mb-2">Error Loading Map</h1>
+        <p className="text-gray-600 mb-4">There was an error loading the map data.</p>
+        <Button asChild>
+          <Link href="/library">Return to Library</Link>
+        </Button>
+      </div>
+    );
+  }
 }
 
 export default Viewmap
-
 
 function UnauthorizedPage() {
   return (
