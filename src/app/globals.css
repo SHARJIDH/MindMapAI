@@ -1,16 +1,36 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-@layer base {
-  :root {
-    --radius: 0.5rem
-  }
-}
+
 body, Button, a, p, .inter, input, label, span {
-  font-family: 'Inter', sans-serif; /* Default font for the body */
+  font-family: 'Inter', sans-serif;
 }
 
 .merriweather {
-  font-family: 'Merriweather', serif; /* Apply Merriweather to specific elements */
+  font-family: 'Merriweather', serif;
 }
 
+:root {
+  --radius: 0.5rem;
+}
+
+.dark body {
+  background-color: rgb(3, 7, 17);
+  color: rgb(229, 231, 235);
+}
+
+/* Light mode styles */
+@media (prefers-color-scheme: light) {
+  :root {
+    --background: white;
+    --foreground: rgb(17, 24, 39);
+  }
+}
+
+/* Dark mode styles */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: rgb(3, 7, 17);
+    --foreground: rgb(229, 231, 235);
+  }
+}
