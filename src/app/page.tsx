@@ -5,12 +5,14 @@ import { Button } from '@/components/ui/button'
 import { LogIn, LogOut, Rocket } from 'lucide-react'
 import Image from 'next/image'
 import { ThemeSwitcher } from '@/components/theme-switcher'
+import AnimatedBackground from '@/components/AnimatedBackground'
 
 const page = async () => {
   const isAuth = await auth();
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-950">
+      <AnimatedBackground />
       {/* Navigation */}
       <nav className="flex items-center justify-between p-6 backdrop-blur-sm bg-white/70 dark:bg-gray-950/70 sticky top-0 z-50 border-b border-gray-200 dark:border-gray-800">
         <span className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-indigo-600 dark:from-purple-400 dark:to-indigo-400 text-xl">
@@ -121,7 +123,7 @@ const page = async () => {
         ))}
       </section>
 
-      <section className="mt-10">
+      <section className="mt-10 border-2">
         <Footer />
       </section>
     </div>
@@ -214,7 +216,7 @@ const navigation = {
   connect: [
     {
       name: 'Twitter',
-      href: 'https://twitter.com/Sharjidh',
+      href: '',
     },
     {
       name: 'Github',
@@ -222,7 +224,7 @@ const navigation = {
     },
     {
       name: 'LinkedIn',
-      href: '',
+      href: 'https://www.linkedin.com/in/shaik-sharjidh-51500122b/',
     },
   ],
  
@@ -232,7 +234,7 @@ const Footer = () => {
   return (
     <footer
       aria-labelledby="footer-heading"
-      className="mx-auto font-inter w-full max-w-7xl"
+      className="mx-auto font-inter w-full max-w-7xl 2"
     >
       <h2 id="footer-heading" className="sr-only">
         MindMapAI

@@ -19,9 +19,9 @@ export function ThemeSwitcher() {
         </Button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
-        <DropdownMenu.Content className="min-w-[8rem] rounded-md border bg-white p-1 shadow-md dark:bg-gray-950 dark:border-gray-800" align="end">
+        <DropdownMenu.Content className="min-w-[8rem] rounded-md border bg-white p-1 shadow-md dark:bg-gray-950 dark:border-gray-800 z-999" align="end">
           <DropdownMenu.Item 
-            className="flex cursor-pointer items-center rounded-sm px-2 py-2 text-sm outline-none hover:bg-gray-100 dark:hover:bg-gray-800"
+            className="flex cursor-pointer items-center rounded-sm px-2 py-2 text-sm outline-none hover:bg-gray-100 dark:hover:bg-gray-800 z-999"
             onClick={() => setTheme("light")}
           >
             <Sun className="mr-2 h-4 w-4" />
