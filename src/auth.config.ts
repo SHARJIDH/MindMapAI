@@ -20,8 +20,7 @@ export const authConfig: NextAuthConfig = {
     error: '/auth/error',
   },
   callbacks: {
-    async signIn({ user }) {
-      // Only allow sign-in if user has an email
+    async signIn({ user, account }) {
       if (!user.email) {
         return false;
       }
@@ -38,6 +37,14 @@ export const authConfig: NextAuthConfig = {
         session.user = token.user;
       }
       return session;
+    },
+    async redirect({ url, baseUrl }) {
+      // Allows relative callback URLs
+      if (url.startsWith("/")) return `${baseUrl}${url}`
+      // Allows callback URLs on the same origin
+      else if (new URL(url).origin === baseUrl) return url
+      return baseUrl
     }
-  }
+  },
+  trustHost: true
 };
