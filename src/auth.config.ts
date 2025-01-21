@@ -10,7 +10,10 @@ export const authConfig: NextAuthConfig = {
         params: {
           prompt: "consent",
           access_type: "offline",
-          response_type: "code"
+          response_type: "code",
+          redirect_uri: process.env.NODE_ENV === 'production' 
+            ? 'https://mind-map-ai-nine.vercel.app/api/auth/callback/google'
+            : 'http://localhost:3000/api/auth/callback/google'
         }
       }
     })
@@ -39,9 +42,7 @@ export const authConfig: NextAuthConfig = {
       return session;
     },
     async redirect({ url, baseUrl }) {
-      // Allows relative callback URLs
       if (url.startsWith("/")) return `${baseUrl}${url}`
-      // Allows callback URLs on the same origin
       else if (new URL(url).origin === baseUrl) return url
       return baseUrl
     }
