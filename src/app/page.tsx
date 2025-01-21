@@ -227,7 +227,16 @@ const navigation = {
       href: 'https://www.linkedin.com/in/shaik-sharjidh-51500122b/',
     },
   ],
- 
+  legal: [
+    {
+      name: 'Privacy Policy',
+      href: '/legal/privacy',
+    },
+    {
+      name: 'Terms of Service',
+      href: '/legal/terms',
+    },
+  ],
 }
 
 const Footer = () => {
@@ -254,7 +263,7 @@ const Footer = () => {
            
           </div>
           {/* Navigations */}
-          <div className="mt-16 grid grid-cols-2 gap-14 md:grid-cols-2 lg:mt-0 xl:col-span-2">
+          <div className="mt-16 grid grid-cols-2 gap-14 md:grid-cols-3 lg:mt-0 xl:col-span-2">
             <div className="md:mt-0">
               <span className="text-sm font-semibold leading-6 text-gray-900 dark:text-gray-100">
                 Connect
@@ -275,7 +284,21 @@ const Footer = () => {
               </div>
             </div>
             <div>
-           
+              <span className="text-sm font-semibold leading-6 text-gray-900 dark:text-gray-100">
+                Legal
+              </span>
+              <div className="mt-6 space-y-4">
+                {navigation.legal.map((item) => (
+                  <div key={item.name}>
+                    <Link
+                      href={item.href}
+                      className="text-sm leading-6 text-gray-700 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+                    >
+                      {item.name}
+                    </Link>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
