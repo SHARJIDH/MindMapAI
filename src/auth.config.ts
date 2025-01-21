@@ -1,6 +1,10 @@
 import type { NextAuthConfig } from 'next-auth';
 import Google from 'next-auth/providers/google';
 
+if (!process.env.NEXTAUTH_SECRET) {
+  throw new Error('NEXTAUTH_SECRET environment variable is not set');
+}
+
 export const authConfig: NextAuthConfig = {
   providers: [
     Google({
@@ -19,33 +23,10 @@ export const authConfig: NextAuthConfig = {
     signIn: '/auth/login',
     error: '/auth/error',
   },
-  callbacks: {
-    async signIn({ user, account }) {
-      if (!user.email) {
-        return false;
-      }
-      return true;
-    },
-    async jwt({ token, user }) {
-      if (user) {
-        token.user = user;
-      }
-      return token;
-    },
-    async session({ session, token }) {
-      if (token && token.user) {
-        session.user = token.user;
-      }
-      return session;
-    },
-    async redirect({ url, baseUrl }) {
-      if (url.startsWith("/")) return `${baseUrl}${url}`
-      else if (new URL(url).origin === baseUrl) return url
-      return baseUrl
-    }
+  session: {
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60 // 30 days
   },
-  trustHost: true,
-  baseUrl: process.env.NODE_ENV === 'production' 
-    ? 'https://mind-map-ai-nine.vercel.app'
-    : 'http://localhost:3000'
+  secret: process.env.NEXTAUTH_SECRET,
+  debug: process.env.NODE_ENV === 'development',
 };

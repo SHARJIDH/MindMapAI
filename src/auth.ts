@@ -5,29 +5,63 @@ import prisma from "./app/db";
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
   callbacks: {
-    ...authConfig.callbacks,
-    async signIn({ user }) {
+    async signIn({ user, account }) {
       try {
-        if (user.email) {
+        console.log('Sign-in attempt:', {
+          email: user.email,
+          provider: account?.provider,
+          providerAccountId: account?.providerAccountId
+        });
+
+        if (!user.email) {
+          console.error('No email provided in user object');
+          return false;
+        }
+
+        // Try to find or create user without immediately failing
+        try {
           const ifUserExists = await prisma.user.findUnique({
             where: {
               email: user.email
             }
           });
+
           if (!ifUserExists) {
+            console.log('Creating new user:', user.email);
             await prisma.user.create({
               data: {
-                email: user.email
+                email: user.email,
+                name: user.name || user.email.split('@')[0]
               }
             });
+          } else {
+            console.log('Existing user found:', user.email);
           }
-          return true;
+        } catch (dbError) {
+          console.error('Database operation failed:', dbError);
         }
-        return false;
+
+        return true;
       } catch (error) {
-        console.error('Error in signIn callback:', error);
+        console.error('Fatal error in signIn callback:', error);
         return false;
       }
+    },
+    async jwt({ token, user, account, trigger }) {
+      if (trigger === "signIn" && user) {
+        token.user = {
+          id: user.id,
+          email: user.email,
+          name: user.name
+        };
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (token?.user) {
+        session.user = token.user;
+      }
+      return session;
     }
   }
 });
