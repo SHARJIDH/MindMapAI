@@ -26,8 +26,11 @@ export const createEdge = async (edge: Edge) => {
 
 // Create a new map
 export const createMap = async (map: Map) => {
-   const newmap =  await prisma.map.create({
-        data: map
+   const newmap = await prisma.map.create({
+        data: {
+            name: map.name,
+            email: map.email, // This is needed because it's a foreign key
+        }
     });
    return newmap.id;
 }
@@ -62,7 +65,20 @@ export const getMap = async (email: string, mapId: string) => {
     const map = await prisma.map.findFirst({
         where: {
             id: mapId,
-            email: email
+            OR: [
+                {
+                    email: email // Map owned by the user
+                },
+                {
+                    collaborators: {
+                        some: {
+                            user: {
+                                email: email
+                            }
+                        }
+                    }
+                }
+            ]
         }
     });
     return map;
@@ -72,7 +88,20 @@ export const getMap = async (email: string, mapId: string) => {
 export const getAllMaps = async (email: string) => {
     const maps = await prisma.map.findMany({
         where: {
-            email: email
+            OR: [
+                {
+                    email: email // Maps owned by the user
+                },
+                {
+                    collaborators: {
+                        some: {
+                            user: {
+                                email: email
+                            }
+                        }
+                    }
+                }
+            ]
         }
     });
     return maps;

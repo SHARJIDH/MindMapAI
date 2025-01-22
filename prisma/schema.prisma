@@ -15,10 +15,13 @@ datasource db {
 
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  maps      Map[]
-  content   Content[]
+  id            String   @id @default(cuid())
+  email         String   @unique
+  maps          Map[]    @relation("OwnedMaps")
+  content       Content[]
+  sharedMaps    MapCollaborator[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 model Content {
@@ -31,12 +34,28 @@ model Content {
 }
 
 model Map {
-  id        String   @id @default(cuid())
-  name      String
-  user      User     @relation(fields: [email], references: [email], onDelete: Cascade)
-  email    String
-  nodes     Node[]   
-  edges     Edge[]  
+  id            String   @id @default(cuid())
+  name          String
+  owner         User     @relation("OwnedMaps", fields: [email], references: [email], onDelete: Cascade)
+  email         String
+  nodes         Node[]   
+  edges         Edge[]
+  collaborators MapCollaborator[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model MapCollaborator {
+  id            String         @id @default(cuid())
+  user          User          @relation(fields: [userId], references: [id])
+  userId        String
+  map           Map           @relation(fields: [mapId], references: [id])
+  mapId         String
+  role          CollaboratorRole
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@unique([userId, mapId])
 }
 
 model Edge {
@@ -75,4 +94,10 @@ enum NodeType {
   titleNode
   conceptNode
   termNode
+}
+
+enum CollaboratorRole {
+  VIEWER
+  EDITOR
+  ADMIN
 }

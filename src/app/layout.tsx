@@ -3,6 +3,7 @@ import { Inter, Merriweather } from 'next/font/google'
 import './globals.css'
 import Provider from "../components/Provider/Provider"
 import { ThemeProvider } from './providers'
+import { Toaster } from 'sonner';
 
 const inter = Inter({ subsets: ["latin"] })
 const merriweather = Merriweather({
@@ -33,6 +34,7 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             {children}
+            <Toaster />
           </ThemeProvider>
         </body>
       </html>

@@ -1,5 +1,5 @@
 'use client'
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ReactFlow,
   Controls,
@@ -24,6 +24,8 @@ import ConceptNode from '@/components/customNode/ConceptNode';
 import { targetNode } from '@/app/store/atoms/nodelabel';
 import { reactNode, reactEdge, relativeParentNodePosition, selectedNode } from '@/app/store/atoms/nodes'
 import Menubar from './Menubar';
+import { CollaborationDialog } from "./CollaborationDialog";
+import { Button } from '@/components/ui/button';
 
 interface Node {
   id: string;
@@ -190,10 +192,10 @@ export default function Map({mapname, fetchedNodes, fetchedEdges, mapId}: MapPro
   }, []);
   
 
-  return (
-    
+  const [showCollaborationDialog, setShowCollaborationDialog] = useState(false);
 
-    <div style={{ width: '100vw', height: '100vh' }}>
+  return (
+    <div className="flex h-screen overflow-hidden">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -216,8 +218,20 @@ export default function Map({mapname, fetchedNodes, fetchedEdges, mapId}: MapPro
 
       </ReactFlow>
       <ToastContainer />
+      <div className="absolute top-4 right-4 z-10 flex gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowCollaborationDialog(true)}
+        >
+          Share
+        </Button>
+      </div>
+      <CollaborationDialog
+        isOpen={showCollaborationDialog}
+        onClose={() => setShowCollaborationDialog(false)}
+        mapId={mapId}
+      />
     </div>
-
   );
 }
-
