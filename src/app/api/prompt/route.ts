@@ -1,6 +1,5 @@
-import { generateText } from "ai";
 import { NextResponse } from "next/server";
-import { createOpenAI } from "@ai-sdk/openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const topicDescriptionPrompt = `
 You are an AI assistant providing targeted responses based on different intents. Follow the specific instructions for each intent to keep the response relevant and concise. Adjust the length of the response based on the user's expertise:
@@ -22,7 +21,7 @@ You are an AI assistant providing targeted responses based on different intents.
 **General Guidelines**:
 - Use accessible language for non-experts, while experts can handle technical details and jargon.
 - Incorporate additional context naturally if provided.
-- Align responses to the intent’s purpose (e.g., a benefit for "Pros," a comparison for "Compare").
+- Align responses to the intent's purpose (e.g., a benefit for "Pros," a comparison for "Compare").
 - Ensure clarity and coherence across all responses.
 
 **User Data**: Topic and context: {{selectedNodeData}}
@@ -30,33 +29,28 @@ You are an AI assistant providing targeted responses based on different intents.
 Based on the intent and data provided, generate a response that fulfills the instruction for the selected intent. Adjust the level of detail and length based on the user's expertise.`
 
 export async function POST(req: Request) {
+  if (!process.env.GOOGLE_API_KEY) {
+    return NextResponse.json({ error: "Google API key not configured" }, { status: 500 });
+  }
+
   const { intent, selectedNodeData, isExpert }: { intent: string, selectedNodeData: string, isExpert: boolean } = await req.json();
 
   try {
-    const xai = createOpenAI({
-      name: "xai",
-      baseURL: "https://api.x.ai/v1",
-      apiKey:
-        process.env.XAI_API_KEY,
-    });
+    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
     const formattedPrompt = topicDescriptionPrompt
       .replace("{{Intent}}", intent)
       .replace("{{selectedNodeData}}", selectedNodeData || "")
       .replace("{{isExpert}}", isExpert ? "true" : "false");
 
-
-    const { text } = await generateText({
-      model: xai("grok-beta"),
-      prompt: intent,
-      system: formattedPrompt,
-    });
-
- 
+    const result = await model.generateContent(formattedPrompt);
+    const response = await result.response;
+    const text = response.text();
 
     return NextResponse.json({ information: text });
   } catch (error) {
-    console.error("Error in GROK API call:", error);
+    console.error("Error in Gemini API call:", error);
     return NextResponse.json({ error: error }, { status: 500 });
   }
 }
