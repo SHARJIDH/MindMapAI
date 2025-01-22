@@ -9,7 +9,7 @@ import { useSession } from 'next-auth/react'
 import { toast } from 'react-toastify'
 import { useRecoilValue } from 'recoil'
 import { reactNode, reactEdge } from '@/app/store/atoms/nodes'
-import { createNode, createEdge, deleteNodesAndEdgesByMapId, updateMap } from '@/app/actions/map'
+import { createNode, createEdge, deleteNodesAndEdgesByMapId, updateMap, createMap } from '@/app/actions/map'
 import {
   Dialog,
   DialogContent,
@@ -75,28 +75,27 @@ export default function Menubar({ mapname, mapId }: { mapname?: string, mapId?: 
 
   const { mutate: handleSave, isPending: isSavePending } = useMutation({
     mutationFn: async () => {
-      if (nodes.length < 1) {
-        toast.error('Please add some nodes to the concept map');
-        return;
+      if (!session?.user?.email) {
+        throw new Error('User not authenticated');
       }
+
       if (!mapName.trim()) {
         toast.error('Please enter a map name');
-        return;
-      }
-      if (!session || !session.user || !session.user.email) {
-        toast.error('User session is not available');
         return;
       }
 
       try {
         // Capture the map as an image
-        const imageBuffer = await captureMap('mindmap-container');
+        const dataUrl = await captureMap();
         
+        // Convert data URL to blob
+        const res = await fetch(dataUrl);
+        const blob = await res.blob();
+
         // Create form data for the image upload
         const formData = new FormData();
         const fileName = `${session.user.email}/maps/${Date.now()}-${mapName}.png`;
-        const imageBlob = new Blob([imageBuffer], { type: 'image/png' });
-        formData.append('file', imageBlob, 'map.png');
+        formData.append('file', blob, fileName);
         formData.append('fileName', fileName);
 
         // Upload image using the API route
@@ -105,31 +104,30 @@ export default function Menubar({ mapname, mapId }: { mapname?: string, mapId?: 
           body: formData,
         });
 
+        const responseData = await uploadResponse.json();
+
         if (!uploadResponse.ok) {
-          throw new Error('Failed to upload image');
+          throw new Error(responseData.error || 'Failed to upload image');
         }
 
-        const { url: imageUrl } = await uploadResponse.json();
+        const { url: imageUrl } = responseData;
 
         if (mapId) {
           // Update existing map
-          await handleUpdate({
-            mapId,
-            nodes,
-            edges,
+          await updateMap(mapId, { 
             title: mapName,
-            imageUrl
+            imageUrl 
           });
           toast.success('Map updated successfully!');
         } else {
           // Create new map
-          const map = await createMap({ 
+          const newMapId = await createMap({ 
             name: mapName, 
             email: session.user.email,
             imageUrl 
           });
           toast.success('Map saved successfully!');
-          router.push(`/map/${session?.user?.id}/${map}`);
+          router.push(`/map/${session?.user?.id}/${newMapId}`);
         }
 
         setIsSaveDialogOpen(false);
@@ -139,8 +137,8 @@ export default function Menubar({ mapname, mapId }: { mapname?: string, mapId?: 
       }
     },
     onError: (error) => {
-      console.error(error);
-      toast.error('An error occurred while saving the map');
+      console.error('Error saving map:', error);
+      toast.error(error instanceof Error ? error.message : 'An error occurred while saving the map');
     }
   });
 

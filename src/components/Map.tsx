@@ -52,23 +52,36 @@ interface MapProps {
 
 export default function Map({ mapId, mapname, fetchedNodes, fetchedEdges }: MapProps) {  
   
-  const [nodes, setNodes] = useRecoilState(reactNode);
-  const [edges, setEdges] = useRecoilState(reactEdge);
-  const setSelectedNode = useSetRecoilState(selectedNode);
-  
+  const [nodes, setNodes] = useRecoilState<Node[]>(reactNode);
+  const [edges, setEdges] = useRecoilState<Edge[]>(reactEdge);
+  const [nodeLabel, setNodeLabel] = useRecoilState(nodeLabelState);
+  const [targetNodeId, setTargetNodeId] = useRecoilState(targetNode);
+  const [parentNodePosition, setParentNodePosition] = useRecoilState(relativeParentNodePosition);
+  const [selectedNodeId, setSelectedNodeId] = useRecoilState(selectedNode);
+  const [isCollaborationDialogOpen, setIsCollaborationDialogOpen] = useState(false);
+
   useEffect(() => {
-    if(fetchedNodes && fetchedEdges) {
+    if (fetchedNodes && fetchedEdges) {
       setNodes(fetchedNodes);
       setEdges(fetchedEdges);
+    } else {
+      // Initialize with a default node for new maps
+      const defaultNode = {
+        id: '1',
+        type: 'titleNode',
+        position: { x: window.innerWidth / 2 - 75, y: window.innerHeight / 2 - 25 },
+        data: { label: 'New Mind Map' },
+        selected: false,
+        style: {}
+      };
+      setNodes([defaultNode]);
+      setEdges([]);
     }
-    
-  },[fetchedNodes, fetchedEdges])
+  }, [fetchedNodes, fetchedEdges, setNodes, setEdges]);
 
-  
-  const setNodeLabel = useSetRecoilState(nodeLabelState);
+  const setSelectedNode = useSetRecoilState(selectedNode);
+
   const setTargetNode = useSetRecoilState(targetNode);
-
-  const [parentNodePosition, setParentNodePosition] = useRecoilState(relativeParentNodePosition);
 
   const nodeTypes = {
     'titleNode': CustomTitleNode,
@@ -123,7 +136,7 @@ export default function Map({ mapId, mapname, fetchedNodes, fetchedEdges }: MapP
   const getSelectedNode = useCallback(() => {
     const selectedNode = nodes.find((node: Node) => node.selected || false) as Node | undefined;
     if (selectedNode) {
-      setTargetNode(selectedNode.id);
+      setTargetNodeId(selectedNode.id);
     }
   } 
   , [nodes])
@@ -197,6 +210,7 @@ export default function Map({ mapId, mapname, fetchedNodes, fetchedEdges }: MapP
   return (
     <div style={{ width: '100vw', height: '100%' }} id="mindmap-container">
       <ReactFlow
+        id="react-flow-id"
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}

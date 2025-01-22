@@ -1,12 +1,19 @@
 import Map from "@/components/Map"
-type Props = {}
+import Menubar from "@/components/Menubar"
+import { auth } from "@/auth"
+import { redirect } from "next/navigation"
 
-const MapPage = (props: Props) => {
+export default async function MapPage() {
+  const session = await auth();
+
+  if (!session || !session.user?.email) {
+    redirect('/api/auth/signin');
+  }
+
   return (
-    <>
-      <Map />
-    </>
+    <div className="h-screen relative">
+      <Menubar />
+      <Map fetchedNodes={[]} fetchedEdges={[]} />
+    </div>
   )
 }
-
-export default MapPage
