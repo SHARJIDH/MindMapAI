@@ -25,15 +25,17 @@ export const createEdge = async (edge: Edge) => {
 }
 
 // Create a new map
-export const createMap = async (map: Map) => {
-   const newmap = await prisma.map.create({
-        data: {
-            name: map.name,
-            email: map.email, // This is needed because it's a foreign key
-        }
-    });
-   return newmap.id;
-}
+export const createMap = async (map: { name: string, email: string, imageUrl: string }) => {
+  const newMap = await prisma.map.create({
+    data: {
+      title: map.name, // Use name as title
+      email: map.email,
+      imageUrl: map.imageUrl,
+      description: '' // Add empty description since it's optional
+    }
+  });
+  return newMap.id;
+};
 
 // Create a new content
 export const createContent = async(content: Content) => {
@@ -60,29 +62,25 @@ export const getAllContent = async (email: string) => {
     return contents;
 }
 
-// Get map by email and mapId
+// Get a specific map
 export const getMap = async (email: string, mapId: string) => {
-    const map = await prisma.map.findFirst({
-        where: {
-            id: mapId,
-            OR: [
-                {
-                    email: email // Map owned by the user
-                },
-                {
-                    collaborators: {
-                        some: {
-                            user: {
-                                email: email
-                            }
-                        }
-                    }
-                }
-            ]
-        }
-    });
-    return map;
-}
+  const map = await prisma.map.findFirst({
+    where: {
+      id: mapId,
+      email: email,
+    },
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      imageUrl: true,
+      email: true,
+      createdAt: true,
+      updatedAt: true
+    }
+  });
+  return map;
+};
 
 // Get all maps by email
 export const getAllMaps = async (email: string) => {
@@ -157,28 +155,65 @@ export const deleteMap = async (mapId: string) => {
     return map;
 }
 
-export const updateMap = async(map: Map) => {
+// Update map with any data
+export const updateMap = async (mapId: string, data: Partial<Map>) => {
+  try {
     const updatedMap = await prisma.map.update({
-        where: {
-            id: map.id
-        },
-        data: map
+      where: { id: mapId },
+      data: {
+        ...data,
+        updatedAt: new Date()
+      }
     });
     return updatedMap;
-}
+  } catch (error) {
+    console.error('Error updating map:', error);
+    throw error;
+  }
+};
 
+// Delete nodes and edges by map ID
 export const deleteNodesAndEdgesByMapId = async(mapId: string) => {
-     await prisma.node.deleteMany({
-        where: {
-            mapId: mapId
-        }
-    });
+  await prisma.node.deleteMany({
+    where: {
+      mapId: mapId
+    }
+  });
+  await prisma.edge.deleteMany({
+    where: {
+      mapId: mapId
+    }
+  });
+};
 
-     await prisma.edge.deleteMany({
-        where: {
-            mapId: mapId
-        }
-    });
+// Update map nodes and edges
+export const handleUpdate = async ({mapId, nodes, edges, title, imageUrl}: {mapId: string, nodes: any, edges: any, title: string, imageUrl: string}) => {
+  // First update the map title and image
+  await updateMap(mapId, { title, imageUrl });
 
-    return true;
-}
+  // Delete existing nodes and edges
+  await deleteNodesAndEdgesByMapId(mapId);
+
+  // Create new nodes
+  const nodePromises = nodes.map((node:any) =>
+    createNode({
+      data: node.data,
+      id: node.id,
+      type: node.type,
+      mapId: mapId,
+      position: node.position,
+    })
+  );
+  await Promise.all(nodePromises);
+
+  // Create new edges
+  const edgePromises = edges.map((edge:any) =>
+    createEdge({
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      mapId: mapId,
+    })
+  );
+  await Promise.all(edgePromises);
+};

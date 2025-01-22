@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/app/db";
+import { uploadToS3 } from "@/lib/s3";
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,34 +10,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { name } = await req.json();
-    
-    // First ensure user exists
-    const user = await prisma.user.findUnique({
-      where: {
-        email: session.user.email
-      }
-    });
+    const formData = await req.formData();
+    const imageData = formData.get("image") as File;
+    const title = formData.get("title") as string;
+    const description = formData.get("description") as string;
 
-    if (!user) {
-      // Create user if they don't exist
-      await prisma.user.create({
-        data: {
-          email: session.user.email,
-          id: session.user.id || undefined
-        }
-      });
+    if (!imageData) {
+      return NextResponse.json({ error: "No image provided" }, { status: 400 });
     }
 
-    // Create the map
-    const newMap = await prisma.map.create({
+    // Convert image to buffer and upload to S3
+    const buffer = Buffer.from(await imageData.arrayBuffer());
+    const fileName = `${session.user.email}/${Date.now()}-${imageData.name}`;
+    const imageUrl = await uploadToS3(buffer, fileName);
+
+    // Create map in database with S3 URL
+    const map = await prisma.map.create({
       data: {
-        name,
-        email: session.user.email
-      }
+        title,
+        description,
+        imageUrl,
+        email: session.user.email,
+      },
     });
 
-    return NextResponse.json({ id: newMap.id });
+    return NextResponse.json(map);
   } catch (error) {
     console.error("Error creating map:", error);
     return NextResponse.json(

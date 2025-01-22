@@ -44,13 +44,13 @@ interface Edge {
 }
 
 interface MapProps {
-  mapname?: string;
   mapId?: string;
+  mapname?: string;
   fetchedNodes?: Node[];
   fetchedEdges?: Edge[];
 }
 
-export default function Map({mapname, fetchedNodes, fetchedEdges, mapId}: MapProps) {  
+export default function Map({ mapId, mapname, fetchedNodes, fetchedEdges }: MapProps) {  
   
   const [nodes, setNodes] = useRecoilState(reactNode);
   const [edges, setEdges] = useRecoilState(reactEdge);
@@ -62,7 +62,7 @@ export default function Map({mapname, fetchedNodes, fetchedEdges, mapId}: MapPro
       setEdges(fetchedEdges);
     }
     
-  },[])
+  },[fetchedNodes, fetchedEdges])
 
   
   const setNodeLabel = useSetRecoilState(nodeLabelState);
@@ -195,7 +195,7 @@ export default function Map({mapname, fetchedNodes, fetchedEdges, mapId}: MapPro
   const [showCollaborationDialog, setShowCollaborationDialog] = useState(false);
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div style={{ width: '100vw', height: '100%' }} id="mindmap-container">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -204,13 +204,10 @@ export default function Map({mapname, fetchedNodes, fetchedEdges, mapId}: MapPro
         onConnect={onConnect}
         nodeTypes={nodeTypes}
         fitView
-
+        attributionPosition="top-right"
       >
         <Panel position="top-right">
           <Sidebar addNewEdge={addNewEdge} addNewNode={addNewNode} addDescriptionNode={addDescriptionNode} />
-        </Panel>
-        <Panel position='top-left' >
-        <Menubar mapId={mapId} mapname={mapname} />
         </Panel>
 
         <Controls />

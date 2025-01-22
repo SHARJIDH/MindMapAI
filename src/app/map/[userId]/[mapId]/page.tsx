@@ -1,51 +1,44 @@
-import React from 'react'
-import { auth } from '@/auth';
+import { auth } from "@/auth"
+import { redirect } from "next/navigation"
 import Map from '@/components/Map';
-import { AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { getEdgesByMapId, getNodesByMapId, getMap } from '@/app/actions/map';
+import Menubar from '@/components/Menubar';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const Viewmap = async ({ params }: { params: { userId: string, mapId: string } }) => {
-
+export default async function MapPage({ params }: { params: { userId: string, mapId: string } }) {
   const session = await auth();
-  const sessionId = session?.user?.id;
-  const {userId, mapId} = params;
+  const mapId = params.mapId;
 
-  if (userId !== sessionId) {
-    console.log('Unauthorized')
-    return <UnauthorizedPage />
+  if (!session || !session.user?.email) {
+    redirect('/api/auth/signin');
   }
 
   try {
+    // Get map data
+    const map = await getMap(session.user.email, mapId);
+
+    if (!map) {
+      return <div>Map not found</div>;
+    }
+
     const nodes = await getNodesByMapId(mapId);
     const edges = await getEdgesByMapId(mapId);
-    const map = await getMap(session?.user?.email, mapId);
 
     return (
-      <>
-        <Map mapId={mapId} mapname={map?.name} fetchedNodes={nodes} fetchedEdges={edges} />
-      </>
+      <div className="h-screen relative">
+        <Menubar mapname={map.title} mapId={params.mapId} />
+        <Map mapId={mapId} mapname={map.title} fetchedNodes={nodes} fetchedEdges={edges} />
+      </div>
     )
   } catch (error) {
     console.error('Error loading map:', error);
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen">
-        <AlertCircle className="w-16 h-16 text-red-500 mb-4" />
-        <h1 className="text-2xl font-bold mb-2">Error Loading Map</h1>
-        <p className="text-gray-600 mb-4">There was an error loading the map data.</p>
-        <Button asChild>
-          <Link href="/library">Return to Library</Link>
-        </Button>
-      </div>
-    );
+    return <div>Error loading map</div>;
   }
 }
-
-export default Viewmap
 
 function UnauthorizedPage() {
   return (

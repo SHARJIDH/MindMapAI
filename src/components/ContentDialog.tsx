@@ -120,5 +120,4 @@ function ContentDialog({ open, onClose, content, isLoading, contentType }: Conte
     prevProps.isLoading === nextProps.isLoading
 )
 
-export default ContentDialog
-
+export { ContentDialog };

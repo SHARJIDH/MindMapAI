@@ -35,14 +35,18 @@ model Content {
 
 model Map {
   id            String   @id @default(cuid())
-  name          String
-  owner         User     @relation("OwnedMaps", fields: [email], references: [email], onDelete: Cascade)
+  title         String
+  description   String?
+  imageUrl      String
   email         String
+  owner         User     @relation("OwnedMaps", fields: [email], references: [email], onDelete: Cascade)
   nodes         Node[]   
   edges         Edge[]
   collaborators MapCollaborator[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  @@index([email])
 }
 
 model MapCollaborator {

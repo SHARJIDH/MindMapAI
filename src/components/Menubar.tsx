@@ -1,35 +1,37 @@
 "use client"
 
 import { useState } from 'react'
-import { FileText, Save, BookType, Newspaper, LibraryBig, PencilLine } from 'lucide-react'
+import { FileText, Save, BookType, Newspaper, LibraryBig, PencilLine, Download, Loader2 } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { useMutation } from '@tanstack/react-query'
 import axios from 'axios'
-import { reactNode, reactEdge } from '@/app/store/atoms/nodes'
-import { useRecoilValue } from 'recoil'
-import ContentDialog from '@/components/ContentDialog'
+import { useSession } from 'next-auth/react'
 import { toast } from 'react-toastify'
-import Link from 'next/link'
+import { useRecoilValue } from 'recoil'
+import { reactNode, reactEdge } from '@/app/store/atoms/nodes'
+import { createNode, createEdge, deleteNodesAndEdgesByMapId, updateMap } from '@/app/actions/map'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { useSession } from 'next-auth/react'
-import { createEdge, createMap, createNode, deleteNodesAndEdgesByMapId } from '@/app/actions/map'
 import { Skeleton } from "@/components/ui/skeleton"
 import { useRouter } from 'next/navigation'
+import { captureMap } from '@/lib/capture'
+import Link from 'next/link'
+import { ContentDialog } from './ContentDialog'
+import { prisma } from '@/lib/prisma';
 
 export default function Menubar({ mapname, mapId }: { mapname?: string, mapId?: string }) {
   const { data: session, status } = useSession();
   const router = useRouter();
 
   const [isPhraseDialogOpen, setIsPhraseDialogOpen] = useState(false);
-  const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
-  const [mapName, setMapName] = useState("");
+  const [mapName, setMapName] = useState(mapname || '');
   const [phraseDialogContent, setPhraseDialogContent] = useState({ information: '' });
   const [contentType, setContentType] = useState('');
   const nodes = useRecoilValue(reactNode);
@@ -71,7 +73,7 @@ export default function Menubar({ mapname, mapId }: { mapname?: string, mapId?: 
     }
   })
 
-  const { mutate: handleSave, isPending: isSavePending, data } = useMutation({
+  const { mutate: handleSave, isPending: isSavePending } = useMutation({
     mutationFn: async () => {
       if (nodes.length < 1) {
         toast.error('Please add some nodes to the concept map');
@@ -85,46 +87,69 @@ export default function Menubar({ mapname, mapId }: { mapname?: string, mapId?: 
         toast.error('User session is not available');
         return;
       }
-      const map = await createMap({ name: mapName, email: session.user.email });
-      const nodePromises = nodes.map((node:any) =>
-        createNode({
-          data: node.data,
-          id: node.id,
-          type: node.type,
-          mapId: map,
-          position: node.position,
-        })
-      );
-      await Promise.all(nodePromises);
-      const edgePromises = edges.map((edge:any) =>
-        createEdge({
-          id: edge.id,
-          source: edge.source,
-          target: edge.target,
-          mapId: map,
-        })
-      );
-      await Promise.all(edgePromises);
-      toast.success('Map saved successfully!');
-      setIsSaveDialogOpen(false);
-      setMapName('');
-      return map;
+
+      try {
+        // Capture the map as an image
+        const imageBuffer = await captureMap('mindmap-container');
+        
+        // Create form data for the image upload
+        const formData = new FormData();
+        const fileName = `${session.user.email}/maps/${Date.now()}-${mapName}.png`;
+        const imageBlob = new Blob([imageBuffer], { type: 'image/png' });
+        formData.append('file', imageBlob, 'map.png');
+        formData.append('fileName', fileName);
+
+        // Upload image using the API route
+        const uploadResponse = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!uploadResponse.ok) {
+          throw new Error('Failed to upload image');
+        }
+
+        const { url: imageUrl } = await uploadResponse.json();
+
+        if (mapId) {
+          // Update existing map
+          await handleUpdate({
+            mapId,
+            nodes,
+            edges,
+            title: mapName,
+            imageUrl
+          });
+          toast.success('Map updated successfully!');
+        } else {
+          // Create new map
+          const map = await createMap({ 
+            name: mapName, 
+            email: session.user.email,
+            imageUrl 
+          });
+          toast.success('Map saved successfully!');
+          router.push(`/map/${session?.user?.id}/${map}`);
+        }
+
+        setIsSaveDialogOpen(false);
+      } catch (error) {
+        console.error('Error saving map:', error);
+        throw error;
+      }
     },
     onError: (error) => {
       console.error(error);
       toast.error('An error occurred while saving the map');
-    },
-    onSuccess: (data) => {
-      console.log('Map saved successfully');
-      console.log(data)
-      router.push(`/map/${session?.user?.id}/${data}`);
     }
   });
 
   const { mutate: handleUpdate, isPending: isUpdating } = useMutation({
-    mutationFn: async ({mapId, nodes, edges}: {mapId: string, nodes: any, edges: any}) => {
+    mutationFn: async ({mapId, nodes, edges, title, imageUrl}: {mapId: string, nodes: any, edges: any, title: string, imageUrl: string}) => {
+      // Delete existing nodes and edges
       await deleteNodesAndEdgesByMapId(mapId);
-      console.log(nodes)
+
+      // Create new nodes
       const nodePromises = nodes.map((node:any) =>
         createNode({
           data: node.data,
@@ -135,6 +160,8 @@ export default function Menubar({ mapname, mapId }: { mapname?: string, mapId?: 
         })
       );
       await Promise.all(nodePromises);
+
+      // Create new edges
       const edgePromises = edges.map((edge:any) =>
         createEdge({
           id: edge.id,
@@ -144,89 +171,167 @@ export default function Menubar({ mapname, mapId }: { mapname?: string, mapId?: 
         })
       );
       await Promise.all(edgePromises);
+
+      // Update map title and image using server action
+      await updateMap(mapId, { title, imageUrl });
     },
     onError: (error) => {
-      console.log(error);
+      console.error('Error updating map:', error);
       toast.error('An error occurred while updating the map');
-      return;
     },
     onSuccess: () => {
-      console.log('Map updated successfully');
-      toast.success('Map updated successfully!');
-      return;
+      toast.success('Map updated successfully');
     }
-
   });
 
+  const handleDownload = async () => {
+    try {
+      if (nodes.length < 1) {
+        toast.error('Please add some nodes to the concept map');
+        return;
+      }
+
+      // Capture the map as an image
+      const imageBuffer = await captureMap('mindmap-container');
+      
+      // Convert buffer to blob
+      const blob = new Blob([imageBuffer], { type: 'image/png' });
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${mapName || 'mindmap'}.png`;
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      
+      // Cleanup
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('Mind map downloaded successfully!');
+    } catch (error) {
+      console.error('Error downloading map:', error);
+      toast.error('Failed to download mind map');
+    }
+  };
+
+  const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
 
   if (status === 'loading') {
     return (
-      <div className="py-4 px-6 bg-white shadow-md rounded-lg">
-        <Skeleton className="h-6 w-1/3 mb-4" />
-        <Skeleton className="h-10 w-full mb-4" />
-        <div className="flex justify-between space-x-2">
-          <Skeleton className="h-8 w-24" />
-          <Skeleton className="h-8 w-24" />
-          <Skeleton className="h-8 w-24" />
-        </div>
+      <div className="absolute top-4 left-4 z-50">
+        <Skeleton className="h-8 w-[100px]" />
       </div>
     )
   }
 
   return (
-    <div className="py-4 px-6 bg-white shadow-md rounded-lg border border-gray-100">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center space-x-2">
-          <span className="font-bold text-xl text-gray-800">Overview</span>
+    <div className="absolute top-4 left-4 z-50">
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          <span className="text-lg font-semibold text-white bg-gray-800/50 backdrop-blur-sm px-3 py-1 rounded-md">
+            {mapname === undefined ? "Untitled Map" : mapname}
+          </span>
         </div>
-        <span className="text-sm font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full">{mapname === undefined ? "Untitled Map" : mapname}</span>
-      </div>
-      <div className="flex space-x-2 mb-4">
-        {mapname === undefined ? (
-          <Button
-            onClick={() => setIsSaveDialogOpen(true)}
-            variant="outline"
-            className="flex-1 h-10 text-sm font-semibold shadow-sm hover:shadow-md transition-all duration-200"
-          >
-            <Save className="h-4 w-4 mr-2" />
-            Save Map
-          </Button>
-        ) : (
-          <Button
-            onClick={() => handleUpdate({mapId, nodes, edges})}
-            variant="outline"
-            className="flex-1 h-10 text-sm font-semibold shadow-sm hover:shadow-md transition-all duration-200"
-            disabled={isUpdating}
-          >
-            <PencilLine className="h-4 w-4 mr-2" />
-            {isUpdating ? 'Updating...' : 'Update Map'}
-          </Button>
-        )}
 
-        <Link href="/library" className="flex items-center justify-center px-4 rounded-md text-sm font-semibold py-2 bg-gray-800 text-white hover:bg-gray-700 transition-colors duration-200 shadow-sm hover:shadow-md">
-          <LibraryBig className="h-4 w-4 mr-2" />
-          Library
-        </Link>
-      </div>
-      <div className="flex justify-between space-x-2">
-        {[
-          { icon: BookType, label: "Essay" },
-          { icon: Newspaper, label: "Blog" },
-          { icon: FileText, label: "Summary" }
-        ].map(({ icon: Icon, label }) => (
+        <div className="flex items-center gap-2">
+          <Dialog open={isSaveDialogOpen} onOpenChange={setIsSaveDialogOpen}>
+            <DialogContent className="sm:max-w-[400px]">
+              <DialogHeader>
+                <DialogTitle>Save Mind Map</DialogTitle>
+                <DialogDescription>
+                  {mapId ? "Update your mind map with a new title" : "Give your mind map a title to save it"}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="py-4">
+                <Input
+                  placeholder="My new map"
+                  value={mapName}
+                  onChange={(e) => setMapName(e.target.value)}
+                  className="w-full text-base py-2"
+                />
+              </div>
+              <DialogFooter>
+                <Button 
+                  disabled={mapName.length < 1 || isSavePending} 
+                  className="w-full h-10 text-sm font-semibold" 
+                  onClick={() => handleSave()}
+                >
+                  {isSavePending ? 'Saving...' : 'Save'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {mapname === undefined ? (
+            <Button
+              onClick={() => setIsSaveDialogOpen(true)}
+              variant="outline"
+              size="sm"
+              className="shadow-sm bg-white/50 backdrop-blur-sm hover:bg-white/70"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              Save
+            </Button>
+          ) : (
+            <Button
+              onClick={() => handleUpdate({mapId, nodes, edges, title: mapName, imageUrl: ''})}
+              variant="outline"
+              size="sm"
+              className="shadow-sm bg-white/50 backdrop-blur-sm hover:bg-white/70"
+              disabled={isUpdating}
+            >
+              <PencilLine className="h-4 w-4 mr-2" />
+              {isUpdating ? 'Updating...' : 'Update'}
+            </Button>
+          )}
+
           <Button
-            onClick={() => getContent({ subjectData: extractNodeData(), intent: label.toUpperCase() })}
-            key={label}
+            onClick={handleDownload}
             variant="outline"
             size="sm"
-            className="flex-1 font-semibold text-gray-700 border hover:bg-gray-50 transition-all duration-200"
-            disabled={nodes.length < 1}
+            className="shadow-sm bg-white/50 backdrop-blur-sm hover:bg-white/70"
           >
-            <Icon className="h-4 w-4 mr-1" />
-            {label}
+            <Download className="h-4 w-4 mr-2" />
+            Download
           </Button>
-        ))}
+
+          <Link href="/library">
+            <Button
+              variant="outline"
+              size="sm"
+              className="shadow-sm bg-white/50 backdrop-blur-sm hover:bg-white/70"
+            >
+              <LibraryBig className="h-4 w-4 mr-2" />
+              Library
+            </Button>
+          </Link>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {[
+            { icon: BookType, label: "Essay" },
+            { icon: Newspaper, label: "Blog" },
+            { icon: FileText, label: "Summary" }
+          ].map(({ icon: Icon, label }) => (
+            <Button
+              onClick={() => getContent({ subjectData: extractNodeData(), intent: label.toUpperCase() })}
+              key={label}
+              variant="outline"
+              size="sm"
+              className="shadow-sm bg-white/50 backdrop-blur-sm hover:bg-white/70"
+              disabled={nodes.length < 1}
+            >
+              <Icon className="h-4 w-4 mr-2" />
+              {label}
+            </Button>
+          ))}
+        </div>
       </div>
+
       <ContentDialog
         open={isPhraseDialogOpen}
         onClose={() => setIsPhraseDialogOpen(false)}
@@ -234,34 +339,6 @@ export default function Menubar({ mapname, mapId }: { mapname?: string, mapId?: 
         isLoading={isPending}
         contentType={contentType}
       />
-      <Dialog open={isSaveDialogOpen} onOpenChange={setIsSaveDialogOpen}>
-        <DialogContent className="sm:max-w-[400px]">
-        <DialogHeader>
-          <DialogTitle asChild>
-            <p className="text-xl font-bold text-gray-800">Name Your Concept Map</p>
-          </DialogTitle>
-        </DialogHeader>
-          <div className="py-4">
-            <Input
-              placeholder="My new map"
-              value={mapName}
-              onChange={(e) => setMapName(e.target.value)}
-              className="w-full text-base py-2"
-            />
-          </div>
-          <DialogFooter>
-            <Button 
-              disabled={mapName.length < 1 || isSavePending} 
-              className="w-full h-10 text-sm font-semibold shadow-sm hover:shadow-md transition-all duration-200" 
-              onClick={() => handleSave()}
-              
-            >
-              {isSavePending ? 'Saving...' : 'Save'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
-
